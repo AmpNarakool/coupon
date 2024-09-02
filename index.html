@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สำหรับใช้คูปองส่วนลด</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            background-color: #f0f0f0;
+        }
+
+        #app {
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        input {
+            padding: 10px;
+            width: 80%;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+      
+        #redeemButton {
+            width: 200px;
+        }
+      
+        button:hover {
+            background-color: #218838;
+        }
+      
+        #cancelButton {
+            background-color: #aaaaaa;
+            display: none;
+        }
+      
+        #cancelButton:hover {
+            background-color: #777777ff;
+        }
+
+        #message {
+            margin-top: 20px;
+            color: red;
+            font-weight: bold;
+        }
+
+        #qrCode {
+            margin-top: 20px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+      
+        #promptpayQRCodeContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #promptpayQRCode {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h2>กรอกโค้ดส่วนลดที่นี่</h2>
+        <input type="text" id="couponCode" placeholder="Enter Coupon Code">
+        <button id="redeemButton">ใช้งาน</button>
+        <button id="cancelButton">ยกเลิก</button>
+        <p id="message"></p>
+      
+        <div id="qrCode">
+            <p style="color: red; font-weight: bold"> คูปองใช้ได้เพียง 1 ครั้ง<br>หากไม่ต้องการใช้ตอนนี้ให้กดยกเลิก</p>
+            <h3>แสกน QR Code เพื่อชำระเงิน</h3>
+          <br>
+            <div id="h2-Contrainer">
+              <div id="h2-box">
+                <h2>ยอดที่ต้องชำระ: <span id="finalPrice"></span> บาท</h2>
+              </div>
+            </div>
+            <div id="promptpayQRCodeContainer">
+                <div id="promptpayQRCode"></div>
+                <img id="imgqr" src="" alt="QR Code"/>
+            </div>
+            <p>ราคาเช่าปกติไอดี NO.1 <span id="originalPrice"></span> บาท <br> ใช้คูปอง <span id="validCoupons"></span> ได้รับส่วนลด <span id="discount"></span> บาท</p>   
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.js" integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=" crossorigin="anonymous"></script>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        const ORIGINAL_PRICE = 359; // ราคาเช่าไอดี NO.1
+
+        function updatePriceInfo(couponCode, discountAmount) {
+            const originalPriceElement = document.getElementById('originalPrice');
+            const validCouponsElement = document.getElementById('validCoupons');
+            const discountElement = document.getElementById('discount');
+            const finalPriceElement = document.getElementById('finalPrice');
+
+            originalPriceElement.textContent = ORIGINAL_PRICE.toFixed(2);
+            validCouponsElement.textContent = couponCode;
+            discountElement.textContent = discountAmount.toFixed(2);
+
+            const finalPrice = ORIGINAL_PRICE - discountAmount;
+            finalPriceElement.textContent = finalPrice.toFixed(2);
+        }   
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const redeemButton = document.getElementById("redeemButton");
+            const cancelButton = document.getElementById("cancelButton");
+            const message = document.getElementById("message");
+            const qrCode = document.getElementById("qrCode");
+
+            let usedCoupons = JSON.parse(localStorage.getItem("usedCoupons")) || [];
+
+            const validCoupons = {
+                "Code30a": 29,
+                "Code30b": 39,
+                "Code30c": 49,
+                "Code30d": 20,
+                "Code30e": 35,
+                "Code30f": 14,
+            };
+            // Initialize LIFF
+            liff.init({ liffId: "2006144124-l4EK9XxR" })
+                .then(() => {
+                    if (liff.isLoggedIn()) {
+                        return liff.getProfile();
+                    } else {
+                        throw new Error("Please log in to redeem your coupon.");
+                    }
+                })
+                .then(profile => {
+                    const userId = profile.userId;
+                    const displayName = profile.displayName;
+                    //const profileURL = profile.pictureUrl;
+              
+            message.innerHTML = "คูปองใช้ได้เพียง 1 ครั้ง <br> หากไม่ต้องการใช้ตอนนี้ให้ปิดหน้าจอนี้";
+
+            redeemButton.addEventListener("click", function () {
+                const couponCode = document.getElementById("couponCode").value.trim();
+                
+                if (validCoupons.hasOwnProperty(couponCode)) {
+                    if (usedCoupons[userId] && usedCoupons[userId].includes(couponCode)) {
+                        message.textContent = "คุณใช้คูปองนี้แล้ว";
+                        message.style.fontSize = "25px";
+                        message.style.fontWeight = "bold";
+                        qrCode.style.display = "none";
+                        cancelButton.style.display = "none";
+                    } else {
+                        const discountAmount = validCoupons[couponCode];
+                        
+                        message.textContent = "ใช้คูปองสำเร็จ!";
+                        message.style.fontWeight = "bold";
+                        message.style.color = "green";
+                        message.style.fontSize = "25px";
+                        qrCode.style.display = "block";
+                        cancelButton.style.display = "inline-block";
+
+                        sendMessageToChat(displayName, couponCode, discountAmount);
+
+                        // Mark the coupon as used for this user
+                        if (!usedCoupons[userId]) {
+                            usedCoupons[userId] = [];
+                        }
+
+                        usedCoupons[userId].push(couponCode);
+
+                        localStorage.setItem("usedCoupons", JSON.stringify(usedCoupons));
+
+                        // Update price information
+                        updatePriceInfo(couponCode, discountAmount);
+
+                        // Start QR code generation process
+                        startQRCodeGeneration(ORIGINAL_PRICE - discountAmount);
+                    }
+                } else {
+                    message.textContent = "รหัสคูปองไม่ถูกต้อง";
+                    message.style.fontSize = "25px";
+                    message.style.color = "red";
+                    qrCode.style.display = "none";
+                    cancelButton.style.display = "none";
+                }
+            });
+
+            cancelButton.addEventListener("click", function () {
+                const couponCode = document.getElementById("couponCode").value.trim();
+
+                if (confirm("คุณแน่ใจว่าต้องการยกเลิกการใช้คูปองหรือไม่?")) {
+                    if(usedCoupons[userId] && usedCoupons[userId].includes(couponCode)){
+                        // Get the discount amount for the used coupon
+                        const discountAmount = validCoupons[couponCode];
+
+                        // Remove only the current coupon code from the user's used coupons list
+                        const couponIndex = usedCoupons[userId].indexOf(couponCode);              
+                    if (couponIndex !== -1) {
+                        usedCoupons[userId].splice(couponIndex, 1);
+                    }
+                    if (usedCoupons[userId].length === 0) {
+                        delete usedCoupons[userId];
+                    }
+
+                        localStorage.setItem("usedCoupons", JSON.stringify(usedCoupons));
+
+                        message.textContent = "ยกเลิกการใช้คูปองแล้ว";
+                        message.style.fontSize = "25px";
+                        message.style.color = "blue";
+                        cancelButton.style.display = "none";
+                        qrCode.style.display = "none";
+                    } else {
+                        message.textContent = "คุณไม่ได้ใช้คูปอง";
+                        message.style.fontSize = "25px";
+                        message.style.color = "red";
+                        cancelButton.style.display = "none";
+                        qrCode.style.display = "none";
+                    }
+                }
+            });
+        }).catch(err => {
+            message.textContent = err.message;
+            qrCode.style.display = "none";
+            redeemButton.disabled = true;
+            cancelButton.disabled = true;
+            cancelButton.style.display = "none";
+        });
+    });
+//ใช้งาน
+        function sendMessageToChat(displayName, couponCode, discountAmount) {
+            const now = new Date();
+            const formattedDateTime = now.toLocaleString();
+
+            liff.sendMessages([
+              {
+                type: "text",
+                text: `✅แจ้งการใช้คูปองสำเร็จ✅`,
+              },
+              {
+                  type: 'text',
+                  text: `คุณ ${displayName} ใช้คูปอง ${couponCode} \nส่วนลด${discountAmount}บาท \nเมื่อ ${formattedDateTime}`
+
+              }
+            ]).then(() => {
+                console.log('Message sent');
+            }).catch((error) => {
+                console.error('Error sending message:', error);
+            });
+        }
+    
+      
+        //ยกเลิก
+        function sendCanceledMessageToChat(displayName, couponCode, discountAmount) {
+            const now = new Date();
+            const formattedDateTime = now.toLocaleString();
+
+            liff.sendMessages([
+                {
+                    type: "text",
+                    text: `❌แจ้งยกเลิกการใช้คูปอง❌`,
+                },
+                {
+                    type: "text",
+                    text: `คุณ ${displayName} ยกเลิกคูปอง ${couponCode} \nส่วนลด${discountAmount}บาท \nเมื่อ ${formattedDateTime}`,
+                },
+            ]).then(() => {
+                console.log("Message sent");
+            })
+            .catch((error) => {
+                console.error("Error sending message:", error);
+            });
+        }
+
+        function startQRCodeGeneration(finalPrice) {
+            $.ajax({
+                method: 'post',
+                url: 'http://localhost:3000/generateQR',
+                data: {
+                    amount: finalPrice
+                },
+                success: function(response) {
+                    console.log('good', response)
+                    $("#imgqr").attr('src', response.Result)
+                }, error: function(err) {
+                    console.log('bad', err)
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            genQR();
+        });
+    </script>
+    
+</body>
+</html>
