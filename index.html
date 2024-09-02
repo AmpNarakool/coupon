@@ -229,6 +229,8 @@
                         message.style.color = "blue";
                         cancelButton.style.display = "none";
                         qrCode.style.display = "none";
+
+                        sendCanceledMessageToChat(displayName, couponCode, discountAmount);
                     } else {
                         message.textContent = "คุณไม่ได้ใช้คูปอง";
                         message.style.fontSize = "25px";
